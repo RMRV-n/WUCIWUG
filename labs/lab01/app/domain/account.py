@@ -43,10 +43,15 @@ class Account:
         return CheckResult(True)
 
     def withdraw(self, amount):
-        raise NotImplementedError("ЛР1: завершите Account.withdraw")
+    check_result = self.check_withdrawal(amount)
+    if not check_result.ok:
+        raise DomainError(check_result.reason)
+    #вычитаем сумму из баланса
+    self._balance = self._balance - amount
 
     def deposit(self, amount):
-        raise NotImplementedError("ЛР1: завершите Account.deposit")
+    self._validate_amount(amount) #добавили сумму к balance. Проверили как работает сложение в классе Money
+    self._balance = self._balance + amount 
 
     def block(self):
         if self.status != "ACTIVE":
