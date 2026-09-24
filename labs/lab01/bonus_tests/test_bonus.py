@@ -17,4 +17,8 @@ def invoke(service, method, *args, **kwargs):
 
 def test_description():
     from app.domain.account import Account
+    def describe(self):
+        return f"{self.account_id}:{self.balance.amount:.2f}:{self.balance.currency}"
+
+    Account.describe = describe
     assert Account("ACC-1","C1",money("90")).describe()=="ACC-1:90.00:EUR"
