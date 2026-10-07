@@ -58,6 +58,13 @@ class Account:
         self._balance = self._balance.add(amount)
         return self._balance
 
+    def balance_after_withdrawal(self, amount) -> Money:
+        """Возвращает возможный остаток после снятия, но не меняет счёт."""
+        result = self.check_withdrawal(amount)
+        if not result.allowed:
+            raise DomainError(result.code)
+        return self._balance.subtract(amount)
+
     def block(self):
         if self.status != "ACTIVE":
             raise DomainError("INVALID_STATE")
