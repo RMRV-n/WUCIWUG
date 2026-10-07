@@ -23,12 +23,20 @@ class Money:
     def __post_init__(self):
         currency(self.currency)
         decimal_value(self.amount)
+
         try:
             with localcontext() as ctx:
                 ctx.prec = 28
                 normalized = self.amount.quantize(Decimal("0.01"))
         except InvalidOperation as error:
             raise DomainError("INVALID_AMOUNT") from error
+
+        if normalized != self.amount:
+            raise DomainError("INVALID_AMOUNT")
+
+        if normalized < 0:
+            raise DomainError("INVALID_AMOUNT")
+
         object.__setattr__(self, "amount", abs(normalized) if normalized == 0 else normalized)
 
     def same_currency(self, other):
@@ -49,6 +57,30 @@ class Money:
 
     def __str__(self):
         return f"{self.amount:.2f} {self.currency}"
+
+    def __eq__(self, other):
+        if not isinstance(other, Money):
+            return NotImplemented
+        return self.amount == other.amount and self.currency == other.currency
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __lt__(self, other):
+        self.same_currency(other)
+        return self.amount < other.amount
+
+    def __le__(self, other):
+        self.same_currency(other)
+        return self.amount <= other.amount
+
+    def __gt__(self, other):
+        self.same_currency(other)
+        return self.amount > other.amount
+
+    def __ge__(self, other):
+        self.same_currency(other)
+        return self.amount >= other.amount
 
 
 def money(text, code="EUR"):

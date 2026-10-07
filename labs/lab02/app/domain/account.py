@@ -29,27 +29,34 @@ class Account:
         return self._status
 
     def _validate_amount(self, amount):
-        pass  # ЛР2: сумма и валюта
+        if not isinstance(amount, Money):
+            raise DomainError("INVALID_AMOUNT")
+        if amount.amount <= 0:
+            raise DomainError("INVALID_AMOUNT")
+        if amount.currency != self._balance.currency:
+            raise DomainError("CURRENCY_MISMATCH")
 
     def check_withdrawal(self, amount):
         self._validate_amount(amount)
         if self.status != "ACTIVE":
             return CheckResult(False, "ACCOUNT_" + self.status)
-        return CheckResult(True)
+        if amount > self._balance:
+            return CheckResult(False, "INSUFFICIENT_FUNDS")
+        return CheckResult(True, None)
 
     def withdraw(self, amount):
         result = self.check_withdrawal(amount)
         if not result.allowed:
             raise DomainError(result.code)
-        self._balance = self.balance.subtract(amount)
-        return self.balance
+        self._balance = self._balance.subtract(amount)
+        return self._balance
 
     def deposit(self, amount):
         self._validate_amount(amount)
         if self.status != "ACTIVE":
             raise DomainError("ACCOUNT_" + self.status)
-        self._balance = self.balance.add(amount)
-        return self.balance
+        self._balance = self._balance.add(amount)
+        return self._balance
 
     def block(self):
         if self.status != "ACTIVE":
