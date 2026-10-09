@@ -15,10 +15,10 @@ def error(code, operation):
 def invoke(service, method, *args, **kwargs):
     return api.call(service, method, *args, **kwargs)
 
-def test_description():
+def test_close_composed_invariant():
     from app.domain.account import Account
-    def describe(self):
-        return f"{self.account_id}:{self.balance.amount:.2f}:{self.balance.currency}"
-
-    Account.describe = describe
-    assert Account("ACC-1","C1",money("90")).describe()=="ACC-1:90.00:EUR"
+    item=Account("A","C",money("1"))
+    error("NONZERO_BALANCE",item.close)
+    item.withdraw(money("1"))
+    item.close()
+    error("ACCOUNT_CLOSED",lambda:item.deposit(money("1")))

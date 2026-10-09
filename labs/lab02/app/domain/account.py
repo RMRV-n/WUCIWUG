@@ -1,5 +1,3 @@
-# ЛР1: поля, конструктор и служебные проверки даны преподавателем.
-# Завершите отмеченные методы; API пока использует старые функции.
 from app.support.types import identifier, positive, CheckResult
 from app.support.errors import DomainError
 from app.domain.money import Money, money
@@ -31,27 +29,44 @@ class Account:
         return self._status
 
     def _validate_amount(self, amount):
-        positive(amount)
-        self.balance.same_currency(amount)
+        match amount:
+            case Money() if amount.amount <= 0:
+                raise DomainError("INVALID_AMOUNT")
+            case Money() if amount.currency != self._balance.currency:
+                raise DomainError("CURRENCY_MISMATCH")
+            case Money():
+                return
+            case _:
+                raise DomainError("INVALID_AMOUNT")
 
     def check_withdrawal(self, amount):
         self._validate_amount(amount)
         if self.status != "ACTIVE":
             return CheckResult(False, "ACCOUNT_" + self.status)
-        if amount.amount > self.balance.amount:
+        if amount > self._balance:
             return CheckResult(False, "INSUFFICIENT_FUNDS")
-        return CheckResult(True)
+        return CheckResult(True, None)
 
     def withdraw(self, amount):
-    check_result = self.check_withdrawal(amount)
-    if not check_result.ok:
-        raise DomainError(check_result.reason)
-    #вычитаем сумму из баланса
-    self._balance = self._balance - amount
+        result = self.check_withdrawal(amount)
+        if not result.allowed:
+            raise DomainError(result.code)
+        self._balance = self._balance.subtract(amount)
+        return self._balance
 
     def deposit(self, amount):
-    self._validate_amount(amount) #добавили сумму к balance. Проверили как работает сложение в классе Money
-    self._balance = self._balance + amount 
+        self._validate_amount(amount)
+        if self.status != "ACTIVE":
+            raise DomainError("ACCOUNT_" + self.status)
+        self._balance = self._balance.add(amount)
+        return self._balance
+
+    def balance_after_withdrawal(self, amount) -> Money:
+        """Возвращает возможный остаток после снятия, но не меняет счёт."""
+        result = self.check_withdrawal(amount)
+        if not result.allowed:
+            raise DomainError(result.code)
+        return self._balance.subtract(amount)
 
     def block(self):
         if self.status != "ACTIVE":

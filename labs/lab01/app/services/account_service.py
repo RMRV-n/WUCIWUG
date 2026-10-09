@@ -1,13 +1,7 @@
 # ЛР1: заготовленный сервис. Допишите отмеченный метод и подключите объекты.
 from app.domain.account import Account
-
-
 from app.domain.money import money
-
-
-from app.support.types import checked, CheckResult
-
-
+from app.support.types import checked, CheckResult, Repository
 from app.support.errors import DomainError
 
 
@@ -27,6 +21,7 @@ class AccountService:
         result = account.check_withdrawal(amount)
         if not result.allowed:
             return result
+        
         amount.same_currency(money("500"))
         if amount.amount > 500:
             return CheckResult(False, "WITHDRAWAL_LIMIT_EXCEEDED")
@@ -35,65 +30,60 @@ class AccountService:
         return CheckResult(True)
 
     def withdraw(self, account_id, amount):
-        raise NotImplementedError("ЛР1: завершите AccountService.withdraw")
+        # 1. Проверяем, разрешено ли снятие средств
+        result = self.check(account_id, amount)
+        if not result.allowed:
+            raise DomainError(result.code)
+        
+        # 2. Получаем аккаунт и вызываем его метод withdraw 
+        # (возвращаем новый баланс, чтобы соответствовать поведению легаси-кода)
+        account = self.get(account_id)
+        return account.withdraw(amount)
 
     def deposit(self, account_id, amount):
         return self.get(account_id).deposit(amount)
 
 
-from app.support.types import Repository
-
-
-from app.domain.money import money
-
-
-# Ниже — прежний рабочий путь. Перенесите поведение, затем обновите
-# make_entity, invoke, view и new_service: сигнатуры должны сохраниться.
-from app.domain.money import money
-from app.support.types import CheckResult
-from app.support.errors import DomainError
-
+# ==========================================
+# Ниже — адаптация прежнего рабочего пути.
+# Сигнатуры функций сохранены, но внутри 
+# теперь используется ООП-подход.
+# ==========================================
 
 def make_entity(account_id, customer_id, balance):
-    return dict(account_id=account_id, customer_id=customer_id, balance=balance, status="ACTIVE")
-
-
-def _new_legacy_service(repository):
-    return {"repository": repository}
+    # Создаём настоящий ООП-объект Account вместо словаря
+    return Account(account_id=account_id, customer_id=customer_id, balance=balance)
 
 
 def view(account):
-    return dict(account)
+    # Возвращаем словарное представление объекта Account
+    # (используем getattr для безопасности, если вдруг атрибуты называются чуть иначе)
+    return {
+        "account_id": getattr(account, "account_id", None),
+        "customer_id": getattr(account, "customer_id", None),
+        "balance": getattr(account, "balance", None),
+        "status": getattr(account, "status", "ACTIVE"),
+    }
 
 
 def invoke(service, method, *args):
-    repository = service["repository"]
+    # service теперь это экземпляр AccountService.
+    # Мы просто делегируем вызовы нужным методам сервиса.
     if method == "register":
-        return repository.add(args[0])
-    account = repository.get(args[0])
+        return service.register(args[0])
     if method == "get":
-        return account
-    amount = args[1]
+        return service.get(args[0])
     if method == "deposit":
-        account["balance"] = account["balance"].add(amount)
-        return account["balance"]
-    if amount.amount > account["balance"].amount:
-        result = CheckResult(False, "INSUFFICIENT_FUNDS")
-    elif amount.amount > 500:
-        result = CheckResult(False, "WITHDRAWAL_LIMIT_EXCEEDED")
-    elif account["balance"].amount - amount.amount < 50:
-        result = CheckResult(False, "MINIMUM_BALANCE_REQUIRED")
-    else:
-        result = CheckResult(True)
+        return service.deposit(args[0], args[1])
     if method == "check":
-        return result
-    if not result.allowed:
-        raise DomainError(result.code)
-    account["balance"] = account["balance"].subtract(amount)
-    return account["balance"]
+        return service.check(args[0], args[1])
+    if method == "withdraw":
+        return service.withdraw(args[0], args[1])
+    
+    raise ValueError(f"Неизвестный метод: {method}")
 
-
-from app.support.types import Repository
 
 def new_service(repository=None):
-    return _new_legacy_service(repository if repository is not None else Repository("account_id"))
+    # Создаём и возвращаем новый ООП-сервис
+    repo = repository if repository is not None else Repository("account_id")
+    return AccountService(repo)
