@@ -29,12 +29,15 @@ class Account:
         return self._status
 
     def _validate_amount(self, amount):
-        if not isinstance(amount, Money):
-            raise DomainError("INVALID_AMOUNT")
-        if amount.amount <= 0:
-            raise DomainError("INVALID_AMOUNT")
-        if amount.currency != self._balance.currency:
-            raise DomainError("CURRENCY_MISMATCH")
+        match amount:
+            case Money() if amount.amount <= 0:
+                raise DomainError("INVALID_AMOUNT")
+            case Money() if amount.currency != self._balance.currency:
+                raise DomainError("CURRENCY_MISMATCH")
+            case Money():
+                return
+            case _:
+                raise DomainError("INVALID_AMOUNT")
 
     def check_withdrawal(self, amount):
         self._validate_amount(amount)
