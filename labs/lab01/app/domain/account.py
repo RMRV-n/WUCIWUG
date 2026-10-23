@@ -1,5 +1,3 @@
-# ЛР1: поля, конструктор и служебные проверки даны преподавателем.
-# Завершите отмеченные методы; API пока использует старые функции.
 from app.support.types import identifier, positive, CheckResult
 from app.support.errors import DomainError
 from app.domain.money import Money, money
@@ -43,15 +41,16 @@ class Account:
         return CheckResult(True)
 
     def withdraw(self, amount):
-    check_result = self.check_withdrawal(amount)
-    if not check_result.ok:
-        raise DomainError(check_result.reason)
-    #вычитаем сумму из баланса
-    self._balance = self._balance - amount
+        check_result = self.check_withdrawal(amount)
+        if not check_result.allowed:
+            raise DomainError(check_result.code)
+        self._balance = self._balance.subtract(amount)
+        return self._balance  # ← добавили return
 
     def deposit(self, amount):
-    self._validate_amount(amount) #добавили сумму к balance. Проверили как работает сложение в классе Money
-    self._balance = self._balance + amount 
+        self._validate_amount(amount)
+        self._balance = self._balance.add(amount)
+        return self._balance  # ← добавили return
 
     def block(self):
         if self.status != "ACTIVE":
