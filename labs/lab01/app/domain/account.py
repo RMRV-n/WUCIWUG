@@ -49,8 +49,10 @@ class Account:
 
     def deposit(self, amount):
         self._validate_amount(amount)
+        if self.status != "ACTIVE":
+            raise DomainError("ACCOUNT_" + self.status)
         self._balance = self._balance.add(amount)
-        return self._balance  # ← добавили return
+        return self._balance
 
     def block(self):
         if self.status != "ACTIVE":
