@@ -40,6 +40,7 @@ class MinimumBalanceRule(WithdrawalRule):
             return CheckResult(False, "MINIMUM_BALANCE_REQUIRED")
         return CheckResult(True)
 
+
 class MaximumShareRule(WithdrawalRule):
     def __init__(self, share=Decimal("0.50")):
         decimal_value(share, "INVALID_CONFIG")
@@ -48,22 +49,40 @@ class MaximumShareRule(WithdrawalRule):
         self._share = share
 
     def check(self, account, amount):
-        raise NotImplementedError("ЛР6: новое правило")
+        amount.same_currency(account.balance)
+        limit = account.balance.amount * self._share
+        if amount.amount > limit:
+            return CheckResult(False, "WITHDRAWAL_SHARE_EXCEEDED")
+        return CheckResult(True)
 
 
 class WithdrawalRuleGroup(WithdrawalRule):
     """Последовательность правил: первый отказ, без изменения входных объектов."""
 
     def __init__(self, rules):
-        raise NotImplementedError("ЛР6: реализуйте WithdrawalRuleGroup.__init__ по TASK.md")
+        self._rules = tuple(rules)
+        for rule in self._rules:
+            if not isinstance(rule, WithdrawalRule):
+                raise DomainError("INVALID_CONFIG")
 
     def check(self, account, amount):
-        raise NotImplementedError("ЛР6: реализуйте WithdrawalRuleGroup.check по TASK.md")
+        for rule in self._rules:
+            result = rule.check(account, amount)
+            if not isinstance(result, CheckResult):
+                raise DomainError("INVALID_RESULT")
+            if not result.allowed:
+                return result
+        return CheckResult(True)
 
 
 class MinimumWithdrawalRule(WithdrawalRule):
     def __init__(self, minimum):
-        raise NotImplementedError("ЛР6: реализуйте MinimumWithdrawalRule.__init__ по TASK.md")
+        if not isinstance(minimum, Money) or minimum.amount <= 0:
+            raise DomainError("INVALID_CONFIG")
+        self._minimum = minimum
 
     def check(self, account, amount):
-        raise NotImplementedError("ЛР6: реализуйте MinimumWithdrawalRule.check по TASK.md")
+        amount.same_currency(self._minimum)
+        if amount.amount < self._minimum.amount:
+            return CheckResult(False, "WITHDRAWAL_TOO_SMALL")
+        return CheckResult(True)

@@ -65,3 +65,10 @@ class Account:
         if self.balance.amount != 0:
             raise DomainError("NONZERO_BALANCE")
         self._status = "CLOSED"
+
+    def can_close(self):
+        if self.status not in ("ACTIVE", "BLOCKED"):
+            return False
+        if self.balance.amount != 0:
+            return False
+        return True
