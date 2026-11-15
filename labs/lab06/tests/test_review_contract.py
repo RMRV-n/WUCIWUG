@@ -1,0 +1,62 @@
+import pytest
+from decimal import Decimal
+from datetime import date, datetime, timezone, timedelta
+from app import api
+from app.support.errors import DomainError
+
+
+def assert_code(code, action):
+    with pytest.raises(DomainError) as caught:
+        action()
+    assert caught.value.code == code
+
+from app.support.types import money
+
+from app.domain.account import Account
+from app.domain.money import Money
+
+def test_review_money_exactness_equality_and_read_only_fields():
+    assert Money(Decimal("1.000"),"EUR") == money("1")
+    assert money("1") != money("1","USD")
+    assert_code("INVALID_AMOUNT",lambda:Money(1.0,"EUR"))
+    amount = money("1")
+    with pytest.raises((AttributeError,TypeError)): amount.amount = Decimal("2")
+    with pytest.raises((AttributeError,TypeError)): amount.currency = "USD"
+
+def test_review_closed_and_blocked_deposit_are_atomic():
+    item = Account("A","C",money("0"))
+    item.block()
+    assert_code("ACCOUNT_BLOCKED",lambda:item.deposit(money("1")))
+    assert item.balance == money("0")
+    item.close()
+    assert_code("ACCOUNT_CLOSED",lambda:item.deposit(money("1")))
+    assert_code("INVALID_STATE",item.close)
+    assert item.balance == money("0")
+
+def test_review_reserve_currency_and_no_side_effects():
+    from app.domain.account import Account
+    from app.domain.withdrawal import MinimumBalanceRule
+    item = Account("A","C",money("100"))
+    assert_code("CURRENCY_MISMATCH",lambda:MinimumBalanceRule(money("10","USD")).check(item,money("1")))
+    assert item.balance == money("100")
+
+def test_review_wrong_policy_result_does_not_debit():
+    from app.domain.account import Account
+    from app.domain.withdrawal import WithdrawalRule
+    from app.services.account_service import AccountService
+    from app.support.types import Repository
+    class Wrong(WithdrawalRule):
+        def check(self,account,amount): return None
+    repo = Repository("account_id")
+    item = repo.add(Account("A","C",money("100")))
+    assert_code("INVALID_RESULT",lambda:AccountService(repo,[Wrong()]).withdraw("A",money("1")))
+    assert item.balance == money("100")
+
+def test_review_share_threshold_is_not_rounded_up():
+    from app.domain.account import Account
+    from app.domain.withdrawal import MaximumShareRule
+    item = Account("A","C",money("0.03"))
+    rule = MaximumShareRule(Decimal("0.5"))
+    assert rule.check(item,money("0.01")).allowed
+    assert rule.check(item,money("0.02")).code == "WITHDRAWAL_SHARE_EXCEEDED"
+    assert MaximumShareRule(Decimal("1")).check(item,money("0.03")).allowed
